@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hello Julia, Raelyn and Eloise!</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bangers&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    overflow: hidden;
+    width: 100vw; height: 100vh;
+    background: #030604;
+    font-family: 'Bangers', cursive;
+  }
+
+  /* Full-screen scene canvas (forest + bigfoot) */
+  #scene {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    width: 100%; height: 100%;
+  }
+
+  /* Text layer sits above canvas */
+  #greeting {
+    position: fixed;
+    top: 36%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    text-align: center;
+    line-height: 1.18;
+    pointer-events: none;
+  }
+
+  .word {
+    display: inline-block;
+    font-family: 'Bangers', cursive;
+    font-size: clamp(2.8rem, 7.5vw, 6.5rem);
+    letter-spacing: 6px;
+    margin: 0 4px;
+  }
+  .letter { display: inline-block; }
+
+  .w-hello  { color:#ffe866; text-shadow: 0 0 16px rgba(255,220,0,.9),  3px 3px 0 #6a4800, 6px 6px 0 #2a1800; }
+  .w-julia  { color:#ff9ef5; text-shadow: 0 0 16px rgba(255,80,200,.8), 3px 3px 0 #6a0055, 6px 6px 0 #2a0022; }
+  .w-raelyn { color:#80ffec; text-shadow: 0 0 16px rgba(0,255,200,.8),  3px 3px 0 #005544, 6px 6px 0 #002218; }
+  .w-and    { color:#cccccc; font-size: clamp(1.6rem,3.8vw,3.2rem); text-shadow: 2px 2px 0 #444; }
+  .w-eloise { color:#ffaa66; text-shadow: 0 0 16px rgba(255,130,0,.8),  3px 3px 0 #6a2800, 6px 6px 0 #2a1000; }
+
+  @keyframes letterFall {
+    0%   { transform: translateY(0)    rotate(0)        scale(1);    opacity:1; }
+    10%  { transform: translateY(-30px) rotate(var(--si)) scale(1.15); opacity:1; }
+    100% { transform: translateY(140vh) rotate(var(--rot)) scale(0.02); opacity:0; }
+  }
+  .letter.broken {
+    animation: letterFall 1.7s cubic-bezier(.38,0,.92,1) forwards;
+    animation-delay: var(--dl);
+  }
+
+  @keyframes wordShake {
+    0%,100% { transform:translate(0,0) rotate(0); }
+    10%  { transform:translate(-16px,-8px) rotate(-8deg); }
+    25%  { transform:translate(18px,7px) rotate(8deg); }
+    42%  { transform:translate(-12px,-5px) rotate(-5deg); }
+    60%  { transform:translate(14px,5px) rotate(5deg); }
+    78%  { transform:translate(-7px,-2px) rotate(-2deg); }
+  }
+  .word.shaking { animation: wordShake .55s ease; }
+
+  /* Lightning flash overlay */
+  #flash {
+    position: fixed; inset: 0; z-index: 20;
+    background: white;
+    opacity: 0;
+    pointer-events: none;
+    transition: none;
+  }
+
+  /* Roar text */
+  #roar {
+    position: fixed;
+    top: 22%;
+    left: 50%;
+    transform: translateX(-50%) scale(0);
+    z-index: 25;
+    font-family: 'Bangers', cursive;
+    font-size: clamp(4rem, 14vw, 11rem);
+    letter-spacing: 10px;
+    color: #ff2200;
+    text-shadow: 0 0 40px #ff0000, 0 0 80px #880000, 6px 6px 0 #660000;
+    pointer-events: none;
+    transition: transform .25s cubic-bezier(.22,1,.36,1);
+    white-space: nowrap;
+  }
+  #roar.show { transform: translateX(-50%) scale(1); }
+
+  /* Ground crack SVG overlay */
+  #crack-wrap {
+    position: fixed;
+    bottom: 8vh;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    width: min(70vw, 500px);
+    opacity: 0;
+    transition: opacity .15s;
+    pointer-events: none;
+  }
+
+  /* Flex label */
+  #flex-label {
+    position: fixed;
+    top: 12%;
+    left: 50%;
+    transform: translateX(-50%) scale(0);
+    z-index: 22;
+    font-family: 'Bangers', cursive;
+    font-size: clamp(2.5rem, 8vw, 6.5rem);
+    letter-spacing: 8px;
+    color: #ffe000;
+    white-space: nowrap;
+    text-shadow: 0 0 30px #ff8800, 0 0 60px #ff4400, 5px 5px 0 #8a4000, 10px 10px 0 #3a1800;
+    pointer-events: none;
+    transition: transform .6s cubic-bezier(.22,1,.36,1);
+  }
+  #flex-label.show { transform: translateX(-50%) scale(1); }
+
+  #restart {
+    position: fixed; bottom: 14vh; left: 50%; transform: translateX(-50%);
+    z-index: 30;
+    background: linear-gradient(180deg,#ff8833,#cc4400);
+    color: #fff; border: none;
+    font-family: 'Bangers', cursive; font-size: 2rem; letter-spacing: 4px;
+    padding: 13px 40px; border-radius: 10px; cursor: pointer;
+    box-shadow: 0 6px 0 #882200, 0 14px 30px rgba(0,0,0,.8);
+    display: none;
+  }
+  #restart:hover { filter: brightness(1.12); }
+
+  #credits {
+    position: fixed;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    text-align: center;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(0.65rem, 1.4vw, 0.85rem);
+    letter-spacing: 2px;
+    color: rgba(180, 200, 160, 0.55);
+    text-transform: uppercase;
+    white-space: nowrap;
+    pointer-events: none;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  }
+  #credits span {
+    color: rgba(210, 230, 190, 0.75);
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<!-- Lightning flash -->
+<div id="flash"></div>
+
+<!-- Roar -->
+<div id="roar">GRAAHHH!!</div>
+
+<!-- Ground cracks -->
+<div id="crack-wrap">
+  <svg viewBox="0 0 500 80" xmlns="http://www.w3.org/2000/svg">
+    <path id="crack-path" d="M 250 0 L 240 18 L 215 12 L 200 35 L 170 28 L 150 55 L 120 48 L 95 72
+                              M 250 0 L 262 20 L 288 14 L 304 38 L 332 30 L 355 58 L 385 50 L 410 75
+                              M 240 18 L 228 40 L 210 58
+                              M 288 14 L 300 36 L 320 52"
+      stroke="#1a0a00" stroke-width="2.5" stroke-linecap="round"
+      fill="none" opacity="0.8"
+      style="stroke-dasharray:600;stroke-dashoffset:600;transition:stroke-dashoffset .8s ease-out;"/>
+  </svg>
+</div>
+
+<!-- Text -->
+<div id="greeting">
+  <div><span class="word w-hello" id="w-hello"></span></div>
+  <div>
+    <span class="word w-julia"  id="w-julia"></span>
+    <span class="word w-and"    id="w-c">,</span>
+    <span class="word w-raelyn" id="w-raelyn"></span>
+  </div>
+  <div>
+    <span class="word w-and"    id="w-and2">AND</span>
+    <span class="word w-eloise" id="w-eloise"></span>
+  </div>
+</div>
+
+<div id="flex-label">💪 BIGFOOT WINS 💪</div>
+<button id="restart" onclick="location.reload()">AGAIN! 🌲</button>
+
+<div id="credits">Conceived &amp; crafted by <span>Chris McStoots</span> &nbsp;·&nbsp; Built in collaboration with <span>Claude AI</span></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  CANVAS ENGINE
+// ═══════════════════════════════════════════════════════════════
+const canvas = document.getElementById('scene');
+const ctx    = canvas.getContext('2d');
+let W, H;
+
+function resize(){
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── Easing ──
+const easeOut  = t => 1 - Math.pow(1-t, 3);
+const easeIn   = t => t * t * t;
+const easeInOut= t => t<.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2;
+const lerp     = (a,b,t) => a + (b-a)*t;
+const clamp    = (v,a,b) => Math.max(a, Math.min(b,v));
+
+// ── Camera shake ──
+let shakeAmt = 0, shakeDecay = 0.88;
+let camX = 0, camY = 0;
+function addShake(amt){ shakeAmt = Math.max(shakeAmt, amt); }
+function updateShake(){
+  shakeAmt *= shakeDecay;
+  if(shakeAmt < 0.3){ camX = camY = 0; return; }
+  camX = (Math.random()*2-1) * shakeAmt;
+  camY = (Math.random()*2-1) * shakeAmt;
+}
+
+// ── Stars (static, pre-computed) ──
+const stars = Array.from({length:220}, ()=>({
+  x: Math.random(), y: Math.random()*.68,
+  r: Math.random()*1.5+.2,
+  a: Math.random()*.8+.2,
+  twinkle: Math.random()*Math.PI*2,
+  speed: Math.random()*.02+.005
+}));
+
+// ── Moon ──
+const moon = { xf:.82, yf:.07, r:36 };
+
+// ── Particles (debris + roar particles) ──
+const particles = [];
+function spawnDebris(x, y, count=28){
+  for(let i=0;i<count;i++){
+    const angle = Math.random()*Math.PI*2;
+    const spd   = Math.random()*18+6;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle)*spd * (Math.random()*.5+.7),
+      vy: Math.sin(angle)*spd - Math.random()*12,
+      gy: 0.7 + Math.random()*.4,
+      rot: Math.random()*Math.PI*2,
+      rotV: (Math.random()-.5)*.4,
+      life: 1, decay: Math.random()*.018+.012,
+      size: Math.random()*12+4,
+      color: ['#c8b890','#a09070','#d4c4a0','#807060','#604830','#382010'][Math.floor(Math.random()*6)],
+      shape: Math.random()>.45 ? 'rect' : 'circle'
+    });
+  }
+}
+
+function updateParticles(){
+  for(let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.x  += p.vx; p.y  += p.vy;
+    p.vy += p.gy;
+    p.vx *= .96;
+    p.rot+= p.rotV;
+    p.life -= p.decay;
+    if(p.life<=0) particles.splice(i,1);
+  }
+}
+
+function drawParticles(){
+  particles.forEach(p=>{
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.fillStyle = p.color;
+    if(p.shape==='circle'){
+      ctx.beginPath();
+      ctx.arc(0,0,p.size/2,0,Math.PI*2);
+      ctx.fill();
+    } else {
+      ctx.fillRect(-p.size/2,-p.size/3,p.size,p.size*.6);
+    }
+    ctx.restore();
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+//  BIGFOOT CANVAS PUPPET
+//  All positions are normalized (0-1) then multiplied by scale
+//  so it works at any screen size.
+//  The puppet's "root" is bf.x, bf.y (center-bottom of feet)
+// ─────────────────────────────────────────────────────────────
+const bf = {
+  x: 0.5,          // fraction of W
+  yBottom: 1.15,   // fraction of H (starts below screen)
+  targetY: 0.88,   // where he rises to
+  scale: 1,        // relative to base size
+
+  // Skeleton angles (degrees, 0 = straight down for arms)
+  // LEFT ARM  (viewer left = bf right fist punching)
+  L: {
+    shoulderAngle: 0,   // upper arm angle from vertical (+ = forward/inward)
+    elbowBend: 20,      // elbow bend amount
+  },
+  // RIGHT ARM
+  R: {
+    shoulderAngle: 0,
+    elbowBend: 20,
+  },
+
+  // Body sway
+  bodyAngle: 0,
+  headAngle: 0,
+
+  // Breathing
+  breathPhase: 0,
+
+  // Fur wisps (animated)
+  furPhase: 0,
+
+  // Eye glow
+  eyeGlow: 0.9,
+  eyePulse: 0,
+};
+
+// Derived base size from screen
+function bfBaseSize(){ return Math.min(W, H) * 0.55; }
+
+// ── Draw a rounded limb segment ──
+function drawLimb(x1,y1, x2,y2, w1,w2, color){
+  const dx = x2-x1, dy = y2-y1;
+  const len = Math.sqrt(dx*dx+dy*dy);
+  if(len<1) return;
+  const nx = -dy/len, ny = dx/len;
+
+  ctx.beginPath();
+  ctx.moveTo(x1+nx*w1, y1+ny*w1);
+  ctx.quadraticCurveTo(
+    (x1+x2)/2 + nx*((w1+w2)/2),
+    (y1+y2)/2 + ny*((w1+w2)/2),
+    x2+nx*w2, y2+ny*w2
+  );
+  ctx.lineTo(x2-nx*w2, y2-ny*w2);
+  ctx.quadraticCurveTo(
+    (x1+x2)/2 - nx*((w1+w2)/2),
+    (y1+y2)/2 - ny*((w1+w2)/2),
+    x1-nx*w1, y1-ny*w1
+  );
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+// ── Draw fist ──
+function drawFist(x, y, angle, s, color){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(angle);
+  // Main fist block
+  ctx.beginPath();
+  ctx.roundRect(-s*0.18, -s*0.11, s*0.35, s*0.22, s*0.06);
+  ctx.fillStyle = color;
+  ctx.fill();
+  // Knuckle bumps
+  for(let k=0;k<4;k++){
+    ctx.beginPath();
+    ctx.arc(-s*0.12+k*s*0.076, -s*0.11, s*0.055, 0, Math.PI*2);
+    ctx.fill();
+  }
+  // Thumb stub
+  ctx.beginPath();
+  ctx.ellipse(-s*0.18, -s*0.04, s*0.07, s*0.045, -0.5, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// ── Draw fur wisps around edges ──
+function drawFurEdge(points, s, phase, color){
+  ctx.fillStyle = color;
+  points.forEach((p,i)=>{
+    const wave = Math.sin(phase + i*0.8)*s*0.012;
+    ctx.beginPath();
+    // Spiky fur tuft
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.a + wave*0.3);
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(-s*0.024, s*p.len);
+    ctx.lineTo(0, s*p.len*0.75);
+    ctx.lineTo(s*0.024, s*p.len);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+// ── MASTER BIGFOOT DRAW ──
+function drawBigfoot(now){
+  const s   = bfBaseSize();
+  const bx  = W * bf.x;
+  const by  = H * bf.yBottom;
+  const breath = Math.sin(bf.breathPhase) * s * 0.008;
+  bf.furPhase = now * 0.001;
+
+  ctx.save();
+  ctx.translate(bx + camX, by + camY);
+
+  const BLACK = '#080806';
+  const DARK  = '#0c0c0a';
+
+  // ─── FEET ───
+  // Left foot
+  ctx.save();
+  ctx.translate(-s*0.14, 0);
+  ctx.beginPath();
+  ctx.ellipse(0, -s*0.01, s*0.175, s*0.06, -0.08, 0, Math.PI*2);
+  ctx.fillStyle = BLACK; ctx.fill();
+  // Toes
+  for(let t=0;t<5;t++){
+    ctx.beginPath();
+    ctx.arc(-s*0.13+t*s*0.065, -s*0.05, s*0.04-t*s*0.003, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Right foot
+  ctx.save();
+  ctx.translate(s*0.14, 0);
+  ctx.beginPath();
+  ctx.ellipse(0, -s*0.01, s*0.175, s*0.06, 0.08, 0, Math.PI*2);
+  ctx.fillStyle = BLACK; ctx.fill();
+  for(let t=0;t<5;t++){
+    ctx.beginPath();
+    ctx.arc(-s*0.13+t*s*0.065, -s*0.05, s*0.04-t*s*0.003, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // ─── LEGS ───
+  const legTopL = {x:-s*0.13, y:-s*0.68};
+  const legBotL = {x:-s*0.14, y:-s*0.04};
+  const legTopR = {x: s*0.13, y:-s*0.68};
+  const legBotR = {x: s*0.14, y:-s*0.04};
+
+  drawLimb(legTopL.x,legTopL.y, legBotL.x,legBotL.y, s*0.1,s*0.085, BLACK);
+  drawLimb(legTopR.x,legTopR.y, legBotR.x,legBotR.y, s*0.1,s*0.085, BLACK);
+
+  // ─── ARMS (drawn behind torso) ───
+  // Convert shoulder angles to radians and compute joint positions
+  // Left arm — shoulder pivot relative to bx,by
+  const shoulderL = {x:-s*0.21, y:-s*0.74+breath};
+  const shoulderR = {x: s*0.21, y:-s*0.74+breath};
+  const upperArmLen = s*0.28;
+  const foreArmLen  = s*0.26;
+
+  // Left arm (positive angle = arm swings forward/up toward center)
+  const La_rad = (bf.L.shoulderAngle - 90) * Math.PI/180;
+  const elbowL = {
+    x: shoulderL.x + Math.cos(La_rad)*upperArmLen,
+    y: shoulderL.y + Math.sin(La_rad)*upperArmLen
+  };
+  const La2_rad = La_rad + (bf.L.elbowBend * Math.PI/180);
+  const wristL = {
+    x: elbowL.x + Math.cos(La2_rad)*foreArmLen,
+    y: elbowL.y + Math.sin(La2_rad)*foreArmLen
+  };
+
+  // Right arm (negative angle = swings forward/up toward center)
+  const Ra_rad = (-bf.R.shoulderAngle - 90) * Math.PI/180;
+  const elbowR = {
+    x: shoulderR.x + Math.cos(Ra_rad)*upperArmLen,
+    y: shoulderR.y + Math.sin(Ra_rad)*upperArmLen
+  };
+  const Ra2_rad = Ra_rad - (bf.R.elbowBend * Math.PI/180);
+  const wristR = {
+    x: elbowR.x + Math.cos(Ra2_rad)*foreArmLen,
+    y: elbowR.y + Math.sin(Ra2_rad)*foreArmLen
+  };
+
+  // Draw upper arms
+  drawLimb(shoulderL.x,shoulderL.y, elbowL.x,elbowL.y, s*0.08,s*0.07, BLACK);
+  drawLimb(shoulderR.x,shoulderR.y, elbowR.x,elbowR.y, s*0.08,s*0.07, BLACK);
+  // Draw forearms
+  drawLimb(elbowL.x,elbowL.y, wristL.x,wristL.y, s*0.065,s*0.055, BLACK);
+  drawLimb(elbowR.x,elbowR.y, wristR.x,wristR.y, s*0.065,s*0.055, BLACK);
+  // Fists — angle toward target
+  const fistAngleL = Math.atan2(wristL.y-elbowL.y, wristL.x-elbowL.x);
+  const fistAngleR = Math.atan2(wristR.y-elbowR.y, wristR.x-elbowR.x);
+  drawFist(wristL.x,wristL.y, fistAngleL, s, BLACK);
+  drawFist(wristR.x,wristR.y, fistAngleR, s, BLACK);
+
+  // ─── TORSO (painted over arm roots) ───
+  ctx.save();
+  ctx.translate(0, breath);
+  // Main torso shape
+  ctx.beginPath();
+  ctx.moveTo(-s*0.22, -s*0.68);  // left shoulder
+  ctx.bezierCurveTo(-s*0.28,-s*0.60, -s*0.25,-s*0.40, -s*0.20,-s*0.20);
+  ctx.bezierCurveTo(-s*0.18,-s*0.08, -s*0.14,-s*0.01, -s*0.13,-s*0.00);
+  ctx.lineTo(s*0.13, -s*0.00);
+  ctx.bezierCurveTo(s*0.14,-s*0.01, s*0.18,-s*0.08, s*0.20,-s*0.20);
+  ctx.bezierCurveTo(s*0.25,-s*0.40, s*0.28,-s*0.60, s*0.22,-s*0.68);
+  ctx.bezierCurveTo(s*0.18,-s*0.74, s*0.10,-s*0.78, 0,-s*0.78);
+  ctx.bezierCurveTo(-s*0.10,-s*0.78, -s*0.18,-s*0.74, -s*0.22,-s*0.68);
+  ctx.closePath();
+  ctx.fillStyle = BLACK;
+  ctx.fill();
+
+  // Chest muscle definition (slightly lighter, gives depth to silhouette)
+  ctx.beginPath();
+  ctx.ellipse(-s*0.07, -s*0.50, s*0.07, s*0.09, 0.3, 0, Math.PI*2);
+  ctx.fillStyle = DARK; ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse( s*0.07, -s*0.50, s*0.07, s*0.09, -0.3, 0, Math.PI*2);
+  ctx.fillStyle = DARK; ctx.fill();
+
+  // Shoulder fur masses
+  const furColor = BLACK;
+  // Left shoulder puff
+  ctx.beginPath();
+  ctx.ellipse(-s*0.24, -s*0.72, s*0.10, s*0.07, -0.7, 0, Math.PI*2);
+  ctx.fillStyle = furColor; ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(-s*0.28, -s*0.68, s*0.07, s*0.05, -0.9, 0, Math.PI*2);
+  ctx.fillStyle = furColor; ctx.fill();
+  // Right shoulder puff
+  ctx.beginPath();
+  ctx.ellipse(s*0.24, -s*0.72, s*0.10, s*0.07, 0.7, 0, Math.PI*2);
+  ctx.fillStyle = furColor; ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(s*0.28, -s*0.68, s*0.07, s*0.05, 0.9, 0, Math.PI*2);
+  ctx.fillStyle = furColor; ctx.fill();
+
+  // Fur wisps along torso sides
+  const leftFurPts = [
+    {x:-s*0.28,y:-s*0.65,a:-2.0,len:0.08},
+    {x:-s*0.27,y:-s*0.55,a:-1.9,len:0.07},
+    {x:-s*0.26,y:-s*0.44,a:-1.8,len:0.07},
+    {x:-s*0.24,y:-s*0.33,a:-1.7,len:0.06},
+  ];
+  const rightFurPts = [
+    {x:s*0.28,y:-s*0.65,a:2.0+Math.PI,len:0.08},
+    {x:s*0.27,y:-s*0.55,a:1.9+Math.PI,len:0.07},
+    {x:s*0.26,y:-s*0.44,a:1.8+Math.PI,len:0.07},
+    {x:s*0.24,y:-s*0.33,a:1.7+Math.PI,len:0.06},
+  ];
+  drawFurEdge(leftFurPts,  s, bf.furPhase, furColor);
+  drawFurEdge(rightFurPts, s, bf.furPhase+1, furColor);
+
+  ctx.restore(); // torso translate
+
+  // ─── HEAD ───
+  ctx.save();
+  ctx.translate(0, -s*0.78 + breath*1.4);
+  ctx.rotate(bf.headAngle * Math.PI/180);
+
+  // Neck
+  ctx.beginPath();
+  ctx.roundRect(-s*0.065,-s*0.07, s*0.13, s*0.09, s*0.035);
+  ctx.fillStyle = BLACK; ctx.fill();
+
+  // Main skull — domed, wide
+  ctx.beginPath();
+  ctx.moveTo(-s*0.19, 0);
+  ctx.bezierCurveTo(-s*0.24,-s*0.10, -s*0.24,-s*0.26, -s*0.19,-s*0.38);
+  ctx.bezierCurveTo(-s*0.13,-s*0.50, -s*0.06,-s*0.57, 0,-s*0.58);
+  ctx.bezierCurveTo( s*0.06,-s*0.57,  s*0.13,-s*0.50,  s*0.19,-s*0.38);
+  ctx.bezierCurveTo( s*0.24,-s*0.26,  s*0.24,-s*0.10,  s*0.19, 0);
+  ctx.bezierCurveTo( s*0.12, s*0.04,  s*0.06, s*0.06,  0,  s*0.06);
+  ctx.bezierCurveTo(-s*0.06, s*0.06, -s*0.12, s*0.04, -s*0.19, 0);
+  ctx.closePath();
+  ctx.fillStyle = BLACK; ctx.fill();
+
+  // Sagittal crest — the crown bump
+  ctx.beginPath();
+  ctx.ellipse(0, -s*0.60, s*0.07, s*0.12, 0, 0, Math.PI*2);
+  ctx.fillStyle = BLACK; ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-s*0.06,-s*0.52);
+  ctx.bezierCurveTo(-s*0.04,-s*0.64, s*0.04,-s*0.64, s*0.06,-s*0.52);
+  ctx.fillStyle = BLACK; ctx.fill();
+
+  // Brow shelf
+  ctx.beginPath();
+  ctx.ellipse(0,-s*0.27, s*0.19, s*0.055, 0, 0, Math.PI*2);
+  ctx.fillStyle = BLACK; ctx.fill();
+
+  // Ears
+  ctx.beginPath();
+  ctx.ellipse(-s*0.21,-s*0.20, s*0.055, s*0.085, -0.2, 0, Math.PI*2);
+  ctx.fillStyle = BLACK; ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse( s*0.21,-s*0.20, s*0.055, s*0.085,  0.2, 0, Math.PI*2);
+  ctx.fillStyle = BLACK; ctx.fill();
+
+  // Head fur tufts
+  const headFur = [
+    {x:-s*0.17,y:-s*0.42,a:-2.4,len:0.09},
+    {x:-s*0.08,y:-s*0.58,a:-1.6,len:0.10},
+    {x: 0,     y:-s*0.62,a:-1.55,len:0.10},
+    {x: s*0.08,y:-s*0.58,a:-1.5,len:0.10},
+    {x: s*0.17,y:-s*0.42,a:-0.7,len:0.09},
+  ];
+  drawFurEdge(headFur, s, bf.furPhase*0.7, BLACK);
+
+  // ── EYES — glowing red ──
+  const eyeGlow = bf.eyeGlow + Math.sin(bf.eyePulse)*0.15;
+  // Left eye
+  const eyeGrad = ctx.createRadialGradient(-s*0.075,-s*0.22,0, -s*0.075,-s*0.22,s*0.045);
+  eyeGrad.addColorStop(0, `rgba(255,80,0,${eyeGlow})`);
+  eyeGrad.addColorStop(0.4, `rgba(200,20,0,${eyeGlow*.8})`);
+  eyeGrad.addColorStop(1, 'rgba(150,0,0,0)');
+  ctx.beginPath();
+  ctx.arc(-s*0.075,-s*0.22, s*0.045, 0, Math.PI*2);
+  ctx.fillStyle = eyeGrad; ctx.fill();
+  // Right eye
+  const eyeGrad2 = ctx.createRadialGradient(s*0.075,-s*0.22,0, s*0.075,-s*0.22,s*0.045);
+  eyeGrad2.addColorStop(0, `rgba(255,80,0,${eyeGlow})`);
+  eyeGrad2.addColorStop(0.4, `rgba(200,20,0,${eyeGlow*.8})`);
+  eyeGrad2.addColorStop(1, 'rgba(150,0,0,0)');
+  ctx.beginPath();
+  ctx.arc(s*0.075,-s*0.22, s*0.045, 0, Math.PI*2);
+  ctx.fillStyle = eyeGrad2; ctx.fill();
+
+  // Mouth — open roar shape (controlled by bf.mouthOpen)
+  if(bf.mouthOpen > 0){
+    ctx.beginPath();
+    ctx.ellipse(0,-s*0.08, s*0.07*bf.mouthOpen, s*0.035*bf.mouthOpen, 0, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(60,0,0,${bf.mouthOpen})`;
+    ctx.fill();
+    // Teeth
+    if(bf.mouthOpen > 0.5){
+      ctx.fillStyle = `rgba(220,210,190,${(bf.mouthOpen-.5)*2})`;
+      for(let t=0;t<4;t++){
+        ctx.beginPath();
+        ctx.moveTo(-s*0.045+t*s*0.03, -s*0.08);
+        ctx.lineTo(-s*0.038+t*s*0.03, -s*0.10);
+        ctx.lineTo(-s*0.030+t*s*0.03, -s*0.08);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+
+  ctx.restore(); // head
+
+  ctx.restore(); // main translate
+}
+
+// ─────────────────────────────────────────────────────────────
+//  SCENE DRAWING
+// ─────────────────────────────────────────────────────────────
+let time = 0;
+
+function drawForest(now){
+  // Sky gradient
+  const sky = ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,   '#0a1204');
+  sky.addColorStop(0.5, '#060e03');
+  sky.addColorStop(1,   '#030602');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0,0,W,H);
+
+  // Moon
+  const mx = W*moon.xf, my = H*moon.yf;
+  const moonGrad = ctx.createRadialGradient(mx-moon.r*.3,my-moon.r*.3,0, mx,my,moon.r*1.6);
+  moonGrad.addColorStop(0,   'rgba(255,253,220,.95)');
+  moonGrad.addColorStop(0.4, 'rgba(220,200,60,.6)');
+  moonGrad.addColorStop(0.7, 'rgba(170,150,30,.2)');
+  moonGrad.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.beginPath();
+  ctx.arc(mx,my,moon.r*1.6,0,Math.PI*2);
+  ctx.fillStyle = moonGrad; ctx.fill();
+  ctx.beginPath();
+  ctx.arc(mx,my,moon.r,0,Math.PI*2);
+  const solidMoon = ctx.createRadialGradient(mx-moon.r*.3,my-moon.r*.3,moon.r*.1, mx,my,moon.r);
+  solidMoon.addColorStop(0,'#fffde0');
+  solidMoon.addColorStop(0.6,'#ddc840');
+  solidMoon.addColorStop(1,'#aa9020');
+  ctx.fillStyle = solidMoon; ctx.fill();
+
+  // Stars
+  stars.forEach(st=>{
+    const twinkle = .5 + .5*Math.sin(st.twinkle + now*st.speed);
+    ctx.beginPath();
+    ctx.arc(st.x*W, st.y*H, st.r,0,Math.PI*2);
+    ctx.fillStyle = `rgba(255,255,235,${st.a*twinkle})`;
+    ctx.fill();
+  });
+
+  // ── Tree layers ──
+  function drawTreeLayer(yBase, treeH, color, count, seed){
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    ctx.lineTo(0, H - yBase*H);
+    const rng = (n)=>{ let x=Math.sin(n*9301+49297)*23456; return x-Math.floor(x); };
+    for(let i=0; i<=count; i++){
+      const tx = (i/count)*W;
+      const treeWidth = (rng(seed+i*7)*.5+.5) * W/count * 1.2;
+      const th = treeH * (.6 + rng(seed+i*3)*.8) * H;
+      const baseY = H - (rng(seed+i*11)*.1+.05)*H;
+      // Pine triangle
+      ctx.lineTo(tx - treeWidth*.5, baseY);
+      ctx.lineTo(tx, baseY - th);
+      ctx.lineTo(tx + treeWidth*.5, baseY);
+    }
+    ctx.lineTo(W, H - yBase*H);
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  drawTreeLayer(.10, .45, 'rgba(10,20,6,.75)',  22, 1);
+  drawTreeLayer(.06, .38, 'rgba(6,12,3,.90)',   18, 42);
+  drawTreeLayer(.02, .30, 'rgba(3,7,2,1.0)',    12, 99);
+
+  // Fog
+  const fog = ctx.createLinearGradient(0, H*.78, 0, H);
+  fog.addColorStop(0, 'rgba(0,0,0,0)');
+  fog.addColorStop(.5, 'rgba(140,190,100,.06)');
+  fog.addColorStop(1,  'rgba(120,170,80,.18)');
+  ctx.fillStyle = fog;
+  ctx.fillRect(0, H*.78, W, H*.22);
+
+  // Ground
+  const gnd = ctx.createLinearGradient(0, H*.86, 0, H);
+  gnd.addColorStop(0, '#1a2808');
+  gnd.addColorStop(1, '#050a02');
+  ctx.fillStyle = gnd;
+  ctx.beginPath();
+  ctx.ellipse(W*.5, H*.895, W*.55, H*.055, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillRect(0, H*.89, W, H*.11);
+
+  // Vignette
+  const vig = ctx.createRadialGradient(W*.5,H*.5,H*.28, W*.5,H*.5,H*.78);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(.7,'rgba(0,0,0,.45)');
+  vig.addColorStop(1, 'rgba(0,0,0,.92)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0,0,W,H);
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ANIMATION STATE MACHINE
+// ─────────────────────────────────────────────────────────────
+const SEQ = {
+  IDLE: 'idle',
+  RISING: 'rising',
+  ROAR: 'roar',
+  WINDUP: 'windup',
+  PUNCH: 'punch',
+  RECOIL: 'recoil',
+  FLEX: 'flex',
+  SINK: 'sink',
+  DONE: 'done'
+};
+
+let state = SEQ.IDLE;
+let stateT = 0;       // time in current state (seconds)
+let stateStart = 0;
+
+function enterState(s, now){
+  state = s;
+  stateStart = now;
+  stateT = 0;
+  onEnterState(s, now);
+}
+
+function onEnterState(s, now){
+  if(s === SEQ.RISING){
+    addShake(4);
+  }
+  if(s === SEQ.ROAR){
+    document.getElementById('roar').classList.add('show');
+    bf.eyeGlow = 1.0;
+    // Animate mouth open
+    bf.mouthOpen = 0;
+    setTimeout(()=>{ document.getElementById('roar').classList.remove('show'); }, 1400);
+  }
+  if(s === SEQ.PUNCH){
+    addShake(2);
+  }
+  if(s === SEQ.FLEX){
+    setTimeout(()=>{
+      document.getElementById('flex-label').classList.add('show');
+      setTimeout(()=>{ document.getElementById('restart').style.display='block'; }, 700);
+    }, 400);
+  }
+  if(s === SEQ.SINK){
+    document.getElementById('flex-label').style.transition='opacity 1s';
+    document.getElementById('flex-label').style.opacity='0';
+  }
+}
+
+// ── Smooth arm animation targets ──
+let targetLA = 0, targetRA = 0;
+let targetLElbow = 20, targetRElbow = 20;
+let targetHeadAngle = 0;
+let targetBodyAngle = 0;
+let mouthTarget = 0;
+
+function updateState(now, dt){
+  stateT = (now - stateStart) / 1000;
+  const t = stateT;
+
+  switch(state){
+
+    case SEQ.IDLE:
+      // Start rising after short delay
+      setTimeout(()=> enterState(SEQ.RISING, performance.now()), 800);
+      state = 'waiting';
+      break;
+
+    case SEQ.RISING: {
+      // Rise up from below
+      const riseT = clamp(t / 2.2, 0, 1);
+      bf.yBottom = lerp(1.15, 0.90, easeOut(riseT));
+      addShake(riseT < .8 ? lerp(0,6,riseT*.5) : 0);
+      // Rumble camera as he rises
+      if(riseT < .9) addShake(2.5 * (1-riseT));
+      if(riseT >= 1) enterState(SEQ.ROAR, now);
+      break;
+    }
+
+    case SEQ.ROAR: {
+      // Mouth opens, head tilts back
+      mouthTarget   = t < .4 ? easeOut(t/.4) : t < 1.2 ? 1 : easeIn(1-(t-1.2)/.3);
+      targetHeadAngle = t < .3 ? lerp(0,-12,easeOut(t/.3)) : t<1.2 ? -12 : lerp(-12,0,easeOut((t-1.2)/.4));
+      // Arms hang loose, sway outward in roar
+      targetLA = t < .5 ? lerp(0,15,easeOut(t/.5)) : lerp(15,0,easeOut((t-.5)/.7));
+      targetRA = t < .5 ? lerp(0,15,easeOut(t/.5)) : lerp(15,0,easeOut((t-.5)/.7));
+      if(t >= 1.6) enterState(SEQ.WINDUP, now);
+      break;
+    }
+
+    case SEQ.WINDUP: {
+      // Wind back arms (negative = pulls behind)
+      targetLA = lerp(0, -28, easeIn(clamp(t/.4,0,1)));
+      targetRA = lerp(0, -28, easeIn(clamp(t/.4,0,1)));
+      targetLElbow = lerp(20, 55, clamp(t/.4,0,1));
+      targetRElbow = lerp(20, 55, clamp(t/.4,0,1));
+      targetHeadAngle = lerp(0, 8, clamp(t/.4,0,1));
+      if(t >= .42) enterState(SEQ.PUNCH, now);
+      break;
+    }
+
+    case SEQ.PUNCH: {
+      // SLAM forward and up
+      const p = clamp(t/.22, 0, 1);
+      targetLA = lerp(-28, 138, easeOut(p));
+      targetRA = lerp(-28, 138, easeOut(p));
+      targetLElbow = lerp(55, 5, easeOut(p));
+      targetRElbow = lerp(55, 5, easeOut(p));
+      targetBodyAngle = lerp(0, -5, easeOut(p)); // leans forward
+      targetHeadAngle = lerp(8, -6, easeOut(p));
+
+      // Impact fires at 60% through punch
+      if(t >= .13 && !window._impacted){
+        window._impacted = true;
+        fireImpact();
+      }
+      if(t >= .24) enterState(SEQ.RECOIL, now);
+      break;
+    }
+
+    case SEQ.RECOIL: {
+      // Arms bounce back
+      const p = clamp(t/.55, 0, 1);
+      targetLA = lerp(138, 0, easeOut(p));
+      targetRA = lerp(138, 0, easeOut(p));
+      targetLElbow = lerp(5, 20, easeOut(p));
+      targetRElbow = lerp(5, 20, easeOut(p));
+      targetBodyAngle = lerp(-5, 0, easeOut(p));
+      targetHeadAngle = lerp(-6, 0, easeOut(p));
+      if(t >= .6) enterState(SEQ.FLEX, now);
+      break;
+    }
+
+    case SEQ.FLEX: {
+      // Double bicep — arms curl UP and out
+      const p = clamp(t/.8, 0, 1);
+      const bounce = t > .8 ? Math.sin((t-.8)*8)*3*(1-clamp((t-.8)/.6,0,1)) : 0;
+      targetLA = lerp(0, -150, easeOut(p)) + bounce;
+      targetRA = lerp(0, -150, easeOut(p)) - bounce;
+      targetLElbow = lerp(20, 100, easeOut(p));
+      targetRElbow = lerp(20, 100, easeOut(p));
+      targetHeadAngle = lerp(0, 10, easeOut(clamp(t/.5,0,1))); // looks out proud
+      bf.eyeGlow = .9 + Math.sin(t*4)*.1; // pulsing eyes
+      if(t >= 4.5) enterState(SEQ.SINK, now);
+      break;
+    }
+
+    case SEQ.SINK: {
+      const p = clamp(t/1.8, 0, 1);
+      bf.yBottom = lerp(0.90, 1.18, easeIn(p));
+      if(t >= 1.9) state = SEQ.DONE;
+      break;
+    }
+  }
+
+  // Smooth arm angles toward targets
+  const armSpeed = dt * 18;
+  bf.L.shoulderAngle += (targetLA - bf.L.shoulderAngle) * Math.min(armSpeed, 1);
+  bf.R.shoulderAngle += (targetRA - bf.R.shoulderAngle) * Math.min(armSpeed, 1);
+  bf.L.elbowBend     += (targetLElbow - bf.L.elbowBend) * Math.min(armSpeed*.7, 1);
+  bf.R.elbowBend     += (targetRElbow - bf.R.elbowBend) * Math.min(armSpeed*.7, 1);
+  bf.headAngle       += (targetHeadAngle - bf.headAngle) * Math.min(dt*10, 1);
+  bf.bodyAngle       += (targetBodyAngle - bf.bodyAngle) * Math.min(dt*10, 1);
+  bf.mouthOpen       += (mouthTarget - bf.mouthOpen)     * Math.min(dt*8, 1);
+  bf.breathPhase += dt * 1.2;
+  bf.eyePulse    += dt * 3.0;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  IMPACT EFFECTS
+// ─────────────────────────────────────────────────────────────
+function fireImpact(){
+  const gr = document.getElementById('greeting').getBoundingClientRect();
+  const ix = gr.left + gr.width/2;
+  const iy = gr.top  + gr.height/2;
+
+  // Debris
+  spawnDebris(ix, iy, 32);
+
+  // Break words
+  breakAllWords();
+
+  // Lightning flash
+  lightning(3);
+
+  // Show ground cracks
+  const crackWrap = document.getElementById('crack-wrap');
+  crackWrap.style.opacity = '1';
+  setTimeout(()=>{
+    document.getElementById('crack-path').style.strokeDashoffset = '0';
+  }, 50);
+
+  // Big screen shake
+  addShake(22);
+  setTimeout(()=>addShake(12), 80);
+  setTimeout(()=>addShake(8),  160);
+}
+
+// ── Lightning flash ──
+function lightning(times){
+  const flash = document.getElementById('flash');
+  let count = 0;
+  function doFlash(){
+    if(count >= times) return;
+    flash.style.transition = 'none';
+    flash.style.opacity = (.9 - count*.2).toString();
+    setTimeout(()=>{
+      flash.style.transition = 'opacity .12s ease-out';
+      flash.style.opacity = '0';
+      setTimeout(()=>{
+        count++;
+        if(count < times) setTimeout(doFlash, 60 + count*40);
+      }, 120);
+    }, count===0 ? 60 : 30);
+  }
+  doFlash();
+}
+
+// ── Break words ──
+function buildWord(id, text){
+  const el = document.getElementById(id); if(!el) return;
+  el.innerHTML = text.split('').map(c=>`<span class="letter">${c}</span>`).join('');
+}
+['w-hello','w-julia','w-raelyn','w-eloise'].forEach((id,i)=>{
+  buildWord(id, ['HELLO,','JULIA','RAELYN','ELOISE!'][i]);
+});
+
+function breakAllWords(){
+  ['w-hello','w-julia','w-raelyn','w-and2','w-eloise'].forEach((wid,wi)=>{
+    const el = document.getElementById(wid); if(!el) return;
+    el.classList.add('shaking');
+    setTimeout(()=>el.classList.remove('shaking'), 580);
+    el.querySelectorAll('.letter').forEach((l,i)=>{
+      l.style.setProperty('--rot', (Math.random()*1200-600)+'deg');
+      l.style.setProperty('--si',  (Math.random()*50-25)+'deg');
+      l.style.setProperty('--dl',  (wi*55 + i*28)+'ms');
+      l.classList.add('broken');
+    });
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+//  MAIN LOOP
+// ─────────────────────────────────────────────────────────────
+let lastNow = 0;
+function loop(now){
+  const dt = Math.min((now - lastNow)/1000, .05);
+  lastNow = now;
+  time = now * 0.001;
+
+  updateShake();
+  updateParticles();
+  updateState(now, dt);
+
+  // Draw scene
+  ctx.save();
+  ctx.translate(camX, camY);
+  drawForest(now);
+  drawBigfoot(now);
+  drawParticles();
+  ctx.restore();
+
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
